@@ -16,6 +16,9 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+	"fmt"
+	"runtime"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -465,10 +468,21 @@ func (c *Conn) WriteControl(messageType int, data []byte, deadline time.Time) er
 }
 
 // beginMessage prepares a connection and message writer for a new message.
-func (c *Conn) beginMessage(mw *messageWriter, messageType int) error {
+func (c *Conn) beginMessage(mw *messageWriter, messageType int) (err error) {
 	// Close previous writer if not already closed by the application. It's
 	// probably better to return an error in this situation, but we cannot
 	// change this without breaking existing applications.
+	defer func () {
+	if p := recover(); p != nil {
+			msg := fmt.Sprintf("PANIC: websocket.conn.prepWrite: error: %v", p)
+			log.Warn(msg)
+			err = errors.New(msg)
+			var stackTrace []byte
+			runtime.Stack(stackTrace, true)
+			log.Warn(stackTrace)
+		}
+	}()
+
 	if c.writer != nil {
 		c.writer.Close()
 		c.writer = nil
@@ -479,7 +493,7 @@ func (c *Conn) beginMessage(mw *messageWriter, messageType int) error {
 	}
 
 	c.writeErrMu.Lock()
-	err := c.writeErr
+	err = c.writeErr
 	c.writeErrMu.Unlock()
 	if err != nil {
 		return err
@@ -607,14 +621,14 @@ func (w *messageWriter) flushFrame(final bool, extra []byte) error {
 	// documentation for more info.
 
 	if c.isWriting {
-		panic("concurrent write to websocket connection")
+		panic("BEFORE: concurrent write to websocket connection")
 	}
 	c.isWriting = true
 
 	err := c.write(w.frameType, c.writeDeadline, c.writeBuf[framePos:w.pos], extra)
 
 	if !c.isWriting {
-		panic("concurrent write to websocket connection")
+		panic("AFTER: concurrent write to websocket connection")
 	}
 	c.isWriting = false
 
