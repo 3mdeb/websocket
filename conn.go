@@ -474,10 +474,11 @@ func (c *Conn) beginMessage(mw *messageWriter, messageType int) (err error) {
 	// change this without breaking existing applications.
 	defer func () {
 	if p := recover(); p != nil {
-			msg := fmt.Sprintf("PANIC: websocket.conn.prepWrite: error: %v", p)
+			msg := fmt.Sprintf("PANIC: websocket.conn.prepWrite: error: %v\n", p)
 			log.Warn(msg)
 			err = errors.New(msg)
 			var stackTrace []byte
+			fmt.Println("stacktrace")
 			runtime.Stack(stackTrace, true)
 			log.Warn(stackTrace)
 		}
